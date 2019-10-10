@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-import pint
 from kubernetes import client, config, watch
-from dumper import dump
 
 #Configs can be set in Configuration class directly or using helper utility
 config.load_kube_config()
