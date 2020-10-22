@@ -17,7 +17,9 @@ v1 = client.CoreV1Api()
 ret = v1.list_pod_for_all_namespaces(watch=False)
 for pod in ret.items:
   if (name.lower() in pod.metadata.name.lower()):
-    print (pod.metadata.name,":")
+    print ("="*(len(pod.metadata.name)+20))
+    print (pod.metadata.name,)
+    print ("="*(len(pod.metadata.name)+20))
     try:
       response = v1.read_namespaced_pod_log(name=pod.metadata.name,namespace=pod.metadata.namespace)
       for line in response.splitlines():
