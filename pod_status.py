@@ -17,11 +17,10 @@ ret = v1.list_pod_for_all_namespaces(watch=False)
 for pod in ret.items:
   if (name.lower() in pod.metadata.name.lower()):
     print ("="*(len(pod.metadata.name)+20))
-    print (pod.metadata.name,)
+    print (pod.metadata.name)
     print ("="*(len(pod.metadata.name)+20))
-
-    print ("Running on :",pod.status.host_ip)
-    print ("Internal ip :",pod.status.pod_ip)
-
+    print (pod.status.container_statuses)
+    if (pod.status.reason is not None): 
+      print (pod.status.reason,end="\n")
     print ("")
 
