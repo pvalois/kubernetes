@@ -4,7 +4,6 @@ import os
 import pint
 from kubernetes import client, config, watch
 
-
 def main():
     # setup the namespace
     ns = os.getenv("K8S_NAMESPACE")

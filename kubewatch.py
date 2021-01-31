@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 from kubernetes import client, config, watch
 
 config.load_kube_config(
@@ -8,6 +9,11 @@ config.load_kube_config(
 
 v1 = client.CoreV1Api()
 
-stream = watch.Watch().stream(v1.list_namespaced_pod, "default")
+try: 
+  ns=sys.argv[1]
+except:
+  ns="default"
+
+stream = watch.Watch().stream(v1.list_namespaced_pod, ns)
 for event in stream:
     print("Event: %s %s" % (event['type'], event['object'].metadata.name))
