@@ -29,13 +29,14 @@ for pod in ret.items:
     
     print ("")
 
-    break
-
-    stream = watch.Watch().stream(v1.list_namespaced_event, 
-                                  name=pod.metadata.name, 
-                                  namespace=pod.metadata.namespace, 
-                                  timeout_seconds=1)
-    for event in stream:
-      print("     ",event['object'].message)
+    try:
+      stream = watch.Watch().stream(v1.list_namespaced_event, 
+                                    name=pod.metadata.name, 
+                                    namespace=pod.metadata.namespace, 
+                                    timeout_seconds=1)
+      for event in stream:
+        print("     ",event['object'].message)
+    except:
+      pass
 
     print("")
