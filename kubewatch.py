@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-from kubernetes import client, config, watch
+from kubernetes import client, watch
 
-config.load_kube_config(
-    os.path.join(os.environ["HOME"], '.kube/config'))
-
+w = watch.Watch()
 v1 = client.CoreV1Api()
-
-try: 
-  ns=sys.argv[1]
-except:
-  ns="default"
-
-stream = watch.Watch().stream(v1.list_namespaced_pod, ns)
-for event in stream:
-    print("Event: %s %s" % (event['type'], event['object'].metadata.name))
+for ns in w.stream(v1.list_namespace):
+    #Le code suivant va être exécuté à chaque namespace détecté, puis à chaque évènement touchant un namespace
+    try:
+      obj = ns['object']
+      print("{}: {}".format(ns['type'], obj.metadata.name))
+    except:
+      continue
