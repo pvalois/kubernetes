@@ -19,6 +19,13 @@ v1 = client.CoreV1Api()
 ret = v1.list_pod_for_all_namespaces(watch=False)
 
 for pod in sorted(ret.items, key=lambda x: x.metadata.name):
+  node = pod.spec.node_name or ""
+  node_ip = pod.status.host_ip or ""
+  pod_ip = pod.status.pod_ip
   if (name.lower() in pod.metadata.name.lower()):
-      print (f'{Fore.CYAN}{pod.metadata.name:50} {Fore.GREEN}{pod.status.host_ip:16} {Fore.RESET}{pod.status.pod_ip:16}')
+    if (node_ip != pod_ip):
+      print (f'{Fore.CYAN}{pod.metadata.name:50} {Fore.GREEN}{node:>10}{Fore.RESET}/{Fore.YELLOW}{node_ip:16} {Fore.RESET}-> {Fore.YELLOW}{pod.status.pod_ip:16}')
+    else: 
+      print (f'{Fore.CYAN}{pod.metadata.name:50} {Fore.GREEN}{node:>10}{Fore.RESET}/{Fore.YELLOW}{node_ip:16}')
+
 
