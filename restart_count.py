@@ -25,6 +25,6 @@ def get_counters():
             yield(pod_ns,pod_name,cont_name,container.restart_count)
 
 
-for (namespace,pod,container,counter) in get_counters():
-  print (f"{Fore.GREEN}{namespace} {Fore.YELLOW}{pod} {Fore.CYAN}{container} {Fore.RESET}{counter}")
+for (namespace,pod,container,counter) in sorted(get_counters(), key=lambda k: k[3], reverse=True):
+    print (f"{Fore.GREEN}{namespace:35} {Fore.YELLOW}{pod:60} {Fore.CYAN}{container:35} {Fore.RESET}{counter:6}")
 
