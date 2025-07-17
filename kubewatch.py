@@ -26,6 +26,9 @@ RESOURCE_MAP = {
     "deployment": lambda: client.AppsV1Api().list_deployment_for_all_namespaces,
 }
 
+def timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 def list_resources():
     print("Ressources disponibles :")
     for r in RESOURCE_MAP:
@@ -49,8 +52,7 @@ def watch_resource(name, list_func):
             ns_prefix = f"{namespace}/" if namespace else ""
 
             with print_lock:
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"{Fore.CYAN}{now}   {color}{name.upper():<12} {ev_type:<10}{Style.RESET_ALL} {ns_prefix}{obj_name}")
+                print(f"{Fore.CYAN}{timestamp()}   {color}{name.upper():<12} {ev_type:<10}{Style.RESET_ALL} {ns_prefix}{obj_name}")
     except ApiException as e:
         with print_lock:
             print(f"{Fore.RED}[API ERROR] {e}")
