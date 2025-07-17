@@ -1,37 +1,34 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import pprint
-import json
-from dumper import dump
 from kubernetes import client, config, watch
-from pprint import pprint
+from colorama import Fore, Back, Style, init
 
-kubecmd="kubectl"
-command=" ".join(sys.argv[2:])
+init(autoreset=True)
 
-#Configs can be set in Configuration class directly or using helper utility
-config.load_kube_config()
+def get_pods():
+  #Configs can be set in Configuration class directly or using helper utility
+  config.load_kube_config()
 
-v1 = client.CoreV1Api()
-ret = v1.list_pod_for_all_namespaces(watch=False)
+  v1 = client.CoreV1Api()
+  ret = v1.list_pod_for_all_namespaces(watch=False)
 
-a={}
-for pod in ret.items:
-  nodename=pod.spec.node_name
-  namespace=pod.metadata.namespace
-  keyname=nodename+" "+namespace
+  for pod in ret.items:
+    nodename=pod.spec.node_name
+    namespace=pod.metadata.namespace
 
-  try:
-    a[keyname]+=1
-  except:
-    a[keyname]=1
+    yield(nodename,namespace)
 
-olds=""
-for key in sorted(a):
-  s=key.split(" ")[0]
-  if (s!=olds):
-    print ()
-    olds=s
-  print (key,a[key])
+def main():
+    pods = sorted(set(get_pods()), key=lambda k: (k[0], k[1]))
+    last_node = None
+
+    for node, ns in pods:
+        if node != last_node:
+            if last_node is not None:
+                print()
+            print(f"{Fore.CYAN}{node}")
+            last_node = node
+        print(f"  {Fore.RESET}{ns}")
+
+if __name__ == "__main__":
+    main()
