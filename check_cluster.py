@@ -7,6 +7,27 @@ import argparse
 
 init(autoreset=True)
 
+def get_container_logs(v1, pod, container_name):
+    try:
+        logs = v1.read_namespaced_pod_log(
+            name=pod.metadata.name,
+            namespace=pod.metadata.namespace,
+            container=container_name,
+            tail_lines=10,
+            timestamps=True
+        )
+        return logs.strip().splitlines()
+    except ApiException as e:
+        return [f"{Fore.RED}Erreur lors de la récupération des logs: {e.reason}"]
+
+def get_pod_events(v1_events, pod):
+    try:
+        field_selector = f"involvedObject.name={pod.metadata.name},involvedObject.namespace={pod.metadata.namespace}"
+        events = v1_events.list_event_for_all_namespaces(field_selector=field_selector).items
+        return sorted(events, key=lambda e: e.last_timestamp or e.event_time or e.first_timestamp or 0, reverse=True)
+    except ApiException as e:
+        return []
+
 def check_cluster_health():
     try:
         config.load_kube_config()  # Charge ~/.kube/config
@@ -50,10 +71,11 @@ def check_cluster_health():
 
     return True
 
-def check_pods(verbose=False):
+def check_pods(verbose):
     print("")
     config.load_kube_config()
     v1 = client.CoreV1Api()
+    v1_events = client.CoreV1Api()
     all_pods = v1.list_pod_for_all_namespaces().items
 
     running_pods = []
@@ -76,11 +98,11 @@ def check_pods(verbose=False):
             failed_pods.append(pod)
 
     # Résumé
-    print(f"✅Running pods: {len(running_pods)}")
-    print(f"💥Pending pods: {len(pending_pods)}")
-    print(f"❌Failed/Other pods: {len(failed_pods)}")
+    print(f"✅ Running pods: {len(running_pods)}")
+    print(f"💥 Pending pods: {len(pending_pods)}")
+    print(f"❌ Failed/Other pods: {len(failed_pods)}")
 
-    if verbose:
+    if verbose>=1:
         print("")
         for pod in pending_pods + failed_pods:
             print(f"{Fore.CYAN}[{pod.status.phase}] {pod.metadata.namespace}/{pod.metadata.name}")
@@ -100,15 +122,33 @@ def check_pods(verbose=False):
 
                 print(f"  ↳ container: {name}, reason: {Fore.MAGENTA}{reason}")
 
+                if verbose>=2:
+                    logs = get_container_logs(v1, pod, name)
+                    if logs:
+                        print(f"{Fore.YELLOW}    ⇢ Derniers logs :")
+                        for line in logs:
+                            print(f"{Style.DIM}       {line}")
+
+
+            if verbose>=2:
+                events = get_pod_events(v1_events, pod)
+                if events:
+                    print(f"{Fore.LIGHTBLUE_EX}    ⇢ Événements récents :")
+                    for e in events[:5]:
+                        print(f"{Style.DIM}       [{e.type}] {e.reason}: {e.message} ({e.last_timestamp or e.event_time})")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kubernetes cluster check-up")
     parser.add_argument(
         "-v", "--verbose",
-        action="store_true",
-        help="Affiche plus d'informations"
+        action='count',
+        default=0,
+        help='Augmente le niveau de verbosité (peut être répété, ex: -v, -vv, -vvv)'
     )
+
     args = parser.parse_args()
 
     check_cluster_health() or exit(0)
-    check_pods(verbose=args.verbose)
+    check_pods(args.verbose)
 
