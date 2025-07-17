@@ -13,7 +13,7 @@ def get_counters():
   res = {}
 
   for pod in all_pods.items:
-    pod_ns = "namespace/"+pod.metadata.namespace
+    pod_ns = pod.metadata.namespace
     pod_name = "pod/"+pod.metadata.name
     for container in pod.status.container_statuses:
       cont_name = "image/"+container.name

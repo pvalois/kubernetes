@@ -18,17 +18,22 @@ def get_pods():
 
     yield(nodename,namespace)
 
-def main():
+def coagulate():
     pods = sorted(set(get_pods()), key=lambda k: (k[0], k[1]))
-    last_node = None
+    for node,ns in pods: 
+      yield ((node,ns))
 
-    for node, ns in pods:
-        if node != last_node:
-            if last_node is not None:
-                print()
-            print(f"{Fore.CYAN}{node}")
-            last_node = node
-        print(f"  {Fore.RESET}{ns}")
+def main():
+
+    results=list(coagulate())
+    list_nodes=sorted(set([node for node,ns in results]))
+
+    for n in list_nodes:
+      namespaces=sorted([ns for node, ns in results if node==n])
+      print (f"{Fore.GREEN}{n} {Fore.RESET}({len(namespaces)})\n")
+      for ns in namespaces:
+        print (f"   {Fore.CYAN}{ns}")
+      print ("")
 
 if __name__ == "__main__":
     main()

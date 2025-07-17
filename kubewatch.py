@@ -52,7 +52,7 @@ def watch_resource(name, list_func):
             ns_prefix = f"{namespace}/" if namespace else ""
 
             with print_lock:
-                print(f"{Fore.CYAN}{timestamp()}   {color}{name.upper():<12} {ev_type:<10}{Style.RESET_ALL} {ns_prefix}{obj_name}")
+                print(f"{Style.RESET_ALL}[{Fore.YELLOW}{timestamp()}{Style.RESET_ALL}] {Fore.CYAN}{name.upper():<12} {color}{ev_type:<10}{Style.RESET_ALL} {ns_prefix}{obj_name}")
     except ApiException as e:
         with print_lock:
             print(f"{Fore.RED}[API ERROR] {e}")
