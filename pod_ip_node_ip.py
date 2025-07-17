@@ -3,6 +3,9 @@
 import os, sys
 import pprint
 from kubernetes import client, config, watch
+from colorama import Fore, Back, Style, init
+
+init(autoreset=True)
 
 try:
   name=sys.argv[1]
@@ -14,14 +17,8 @@ config.load_kube_config()
 
 v1 = client.CoreV1Api()
 ret = v1.list_pod_for_all_namespaces(watch=False)
-for pod in ret.items:
+
+for pod in sorted(ret.items, key=lambda x: x.metadata.name):
   if (name.lower() in pod.metadata.name.lower()):
-    print ("="*(len(pod.metadata.name)+20))
-    print (pod.metadata.name,)
-    print ("="*(len(pod.metadata.name)+20))
-
-    print ("Running on :",pod.status.host_ip)
-    print ("Internal ip :",pod.status.pod_ip)
-
-    print ("")
+      print (f'{Fore.CYAN}{pod.metadata.name:50} {Fore.GREEN}{pod.status.host_ip:16} {Fore.RESET}{pod.status.pod_ip:16}')
 
