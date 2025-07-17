@@ -2,7 +2,7 @@
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-from colorama import Fore, Style, init
+from colorama import Fore, Back, Style, init
 import argparse
 
 init(autoreset=True)
@@ -125,7 +125,7 @@ def check_pods(verbose):
                 if verbose>=2:
                     logs = get_container_logs(v1, pod, name)
                     if logs:
-                        print(f"{Fore.YELLOW}    ⇢ Derniers logs :")
+                        print(f"{Fore.BLACK}{Back.YELLOW}    ⇢ Derniers logs :  ")
                         for line in logs:
                             print(f"{Style.DIM}       {line}")
 
@@ -133,9 +133,12 @@ def check_pods(verbose):
             if verbose>=2:
                 events = get_pod_events(v1_events, pod)
                 if events:
-                    print(f"{Fore.LIGHTBLUE_EX}    ⇢ Événements récents :")
+                    print(f"{Fore.BLACK}{Back.LIGHTBLUE_EX}    ⇢ Événements récents :  ")
                     for e in events[:5]:
                         print(f"{Style.DIM}       [{e.type}] {e.reason}: {e.message} ({e.last_timestamp or e.event_time})")
+
+            if verbose>=2: 
+                print ("")
 
 
 if __name__ == "__main__":
