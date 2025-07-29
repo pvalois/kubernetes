@@ -2,7 +2,8 @@
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-from colorama import Fore, Style, init
+from colorama import Fore, Back, Style, init
+from datetime import datetime, timezone
 import argparse
 
 init(autoreset=True)
@@ -23,5 +24,6 @@ def list_pods():
 
 if __name__ == "__main__":
    for (phase,ns,name,node) in sorted(list_pods(), key=lambda k: k[3]):
-        print(f"{phase:<10} {Fore.GREEN}{node}{Style.RESET_ALL}:"
-              f"{Fore.BLUE}{ns}{Style.RESET_ALL}/{Fore.CYAN}{name}")
+        print(f"{Fore.YELLOW+Style.BRIGHT}{phase:<10}{Style.RESET_ALL} "
+              f"{ns:<20} {Fore.CYAN}{name} {Style.RESET_ALL}")
+         

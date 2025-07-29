@@ -10,7 +10,7 @@ try:
 except:
   name=""
 
-kubecmd="microk8s kubectl"
+kubecmd="kubectl"
 command=" ".join(sys.argv[2:])
 
 #Configs can be set in Configuration class directly or using helper utility
