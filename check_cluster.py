@@ -3,6 +3,7 @@
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from colorama import Fore, Back, Style, init
+import re
 import argparse
 
 init(autoreset=True)
@@ -28,7 +29,7 @@ def get_pod_events(v1_events, pod):
     except ApiException as e:
         return []
 
-def check_cluster_health():
+def check_cluster_health(verbosity):
     try:
         config.load_kube_config()  # Charge ~/.kube/config
         v1 = client.CoreV1Api()
@@ -55,19 +56,29 @@ def check_cluster_health():
             print(f"✅ Node {name} est Ready.")
 
     # Check kube-system pods
-    pods = v1.list_namespaced_pod("kube-system").items
+    # pods = v1.list_namespaced_pod("kube-system").items
+    # Patch to handle openshift cluster
+    pods = v1.list_pod_for_all_namespaces().items
     for pod in pods:
         status = pod.status.phase
-        if status not in ("Running", "Succeeded"):
-            print(f"⚠️  kube-system Pod {pod.metadata.name} => {status}")
-    print(f"✅ kube-system pods check terminé")
+        if status not in ("Running", "Succeeded", "Completed"):
+            print(f"⚠️  {pod.metadata.namespace} pod/{pod.metadata.name} => {status}")
+    print(f"✅ check terminé")
 
     # Check composants critiques
-    expected = ["kube-apiserver", "kube-controller-manager", "kube-scheduler"]
-    for name in expected:
-        found = any(name in pod.metadata.name for pod in pods)
-        mark = f"✅" if found else f"{Fore.RED}❌"
-        print(f"{mark} {name}")
+    patterns = {
+        "apiserver": re.compile(r".*-apiserver(-.*)?$"),
+        "controller-manager": re.compile(r".*-controller-manager(-.*)?$"),
+        "scheduler": re.compile(r".*-scheduler(-.*)?$"),
+    }
+
+    for label, pattern in patterns.items():
+        matches = [p.metadata.name for p in pods if pattern.match(p.metadata.name)]
+        mark = "✅" if matches else f"{Fore.RED}❌"
+        print(f"{mark} *-{label}")
+        if verbosity > 0:
+            for name in matches:
+                print(f"       ↳ {name}")
 
     return True
 
@@ -86,7 +97,7 @@ def check_pods(verbose):
         status = pod.status.phase
         conditions = pod.status.conditions or []
 
-        if status == "Running":
+        if status in ("Running", "Succeeded", "Completed"):
             ready_cond = next((c for c in conditions if c.type == "Ready"), None)
             if ready_cond and ready_cond.status == "True":
                 running_pods.append(pod)
@@ -152,6 +163,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    check_cluster_health() or exit(0)
+    check_cluster_health(args.verbose) or exit(0)
     check_pods(args.verbose)
 
