@@ -68,14 +68,14 @@ def collect_data():
         svc_dns = f"{svc_name}.{ns}.svc.cluster.local"
         routes = ingress_routes.get((ns, svc_name), [])
 
-        ports = [p.port for p in es.ports or [] if p.port]
+        ports = [ { "port": p.port, "protocol": p.protocol or "TCP" } for p in es.ports or [] if p.port ]
 
         for ep in es.endpoints:
             ready = ep.conditions.ready
             for addr in ep.addresses or []:
                 if ports:
-                    for port in ports:
-                        rows.append(build_row(ns, svc_name, addr, port, svc_dns, routes, ready))
+                    for p in ports: 
+                        rows.append( build_row( ns, svc_name, addr, f"{p['port']}/{p['protocol']}", svc_dns, routes, ready))
                 else:
                     rows.append(build_row(ns, svc_name, addr, None, svc_dns, routes, ready))
 
@@ -114,7 +114,7 @@ def print_table(rows):
             r["namespace"],
             r["service"],
             r["endpoint_ip"],
-            str(r["port"]) or "",
+            r["port"],
             r["service_dns"],
             "\n".join(r["ingress_urls"]) if r["ingress_urls"] else "",
             str(r["ready"])
