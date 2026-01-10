@@ -4,10 +4,13 @@ import argparse
 import csv
 import json
 import sys
-from collections import defaultdict
 
+from collections import defaultdict
 from kubernetes import client, config
-from tabulate import tabulate
+
+from rich.table import Table
+from rich.table import box
+from rich.console import Console
 
 
 def load_config():
@@ -95,32 +98,30 @@ def build_row(ns, svc, ip, port, dns, routes, ready):
 
 
 def print_table(rows):
-    table = []
+    table = Table(box=box.MINIMAL)
+
+    table.add_column("Namespace", style="white")
+    table.add_column("Service", style="cyan")
+    table.add_column("Endpoint IP", style="yellow")
+    table.add_column("Port", style="white")
+    table.add_column("Service DNS", style="green")
+    table.add_column("Ingress URLS", style="yellow")
+    table.add_column("Ready", style="white")
+
+
     for r in rows:
-        table.append([
+        table.add_row(
             r["namespace"],
             r["service"],
             r["endpoint_ip"],
-            r["port"] or "",
+            str(r["port"]) or "",
             r["service_dns"],
-            "\n".join(r["ingress_urls"]) if r["ingress_urls"] else "—",
-            r["ready"]
-        ])
+            "\n".join(r["ingress_urls"]) if r["ingress_urls"] else "",
+            str(r["ready"])
+        )
 
-    print(tabulate(
-        table,
-        headers=[
-            "Namespace",
-            "Service",
-            "Endpoint IP",
-            "Port",
-            "Service DNS",
-            "Ingress URLs",
-            "Ready"
-        ],
-        tablefmt="plain"
-    ))
-
+    console=Console()
+    console.print(table) 
 
 def output_json(rows):
     data = json.dumps(rows, indent=2)
