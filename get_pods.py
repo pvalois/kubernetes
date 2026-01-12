@@ -15,12 +15,13 @@ def list_pods():
 
     for pod in all_pods:
       pod_phase = pod.status.phase
+      pod_ip=pod.status.pod_ip
       namespace = pod.metadata.namespace
       name = pod.metadata.name
       node = pod.spec.node_name or "N/A"
       labels = [f"{k}={v}" for k, v in (pod.metadata.labels or {}).items()]
 
-      yield (pod_phase, namespace, name, node, labels)
+      yield (pod_phase, namespace, name, pod_ip, node, labels)
 
 console=Console()
 table=Table(box=box.MINIMAL, show_header=True)
@@ -28,11 +29,12 @@ table=Table(box=box.MINIMAL, show_header=True)
 table.add_column("Phase", style="white")
 table.add_column("Namespace", style="cyan")
 table.add_column("Name", style="green")
-table.add_column("Node", style="white")
+table.add_column("IP", style="yellow")
+table.add_column("Node", style="purple")
 table.add_column("Labels", style="white")
 
-for (phase,ns,name,node,labels) in sorted(list_pods(), key=lambda k: k[3]):
-    table.add_row(phase,ns,name,node,"\n".join(labels))
-    table.add_row("", "", "", "", "")
+for (phase,ns,name,ip,node,labels) in sorted(list_pods(), key=lambda k: k[2]):
+    table.add_row(phase,ns,name,ip,node,"\n".join(labels))
+    table.add_row("", "", "", "", "", "")
          
 console.print(table)

@@ -38,6 +38,7 @@ def main():
 
     table = Table(box=box.MINIMAL)
     table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("IP", style="white", no_wrap=True)
     table.add_column("Status", style="green")
     table.add_column("Role", style="magenta")
     table.add_column("CPU (cores)", justify="right")
@@ -48,6 +49,12 @@ def main():
 
     for node in nodes:
         name = node.metadata.name
+        ip = None
+        
+        for address in node.status.addresses:
+            if address.type == "InternalIP":
+                ip = address.address
+                break
 
         # Status Ready or Not
         conditions_dict = {cond.type: cond.status for cond in node.status.conditions}
@@ -87,7 +94,7 @@ def main():
         taints = node.spec.taints or []
         taints_str = ", ".join([f"{t.key}={t.value}:{t.effect}" if t.value else f"{t.key}:{t.effect}" for t in taints]) or "-"
 
-        table.add_row(name, status_str, role, cpu, mem_hum, disk_hum, usage_percent_str, taints_str)
+        table.add_row(name, ip, status_str, role, cpu, mem_hum, disk_hum, usage_percent_str, taints_str)
 
     console.print(table)
 
