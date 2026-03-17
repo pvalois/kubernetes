@@ -79,7 +79,7 @@ def main():
         list_resources()
 
     if not args.resources:
-        args.resources = ["namespace"]
+        args.resources = [r for r in RESOURCE_MAP]
 
     invalid = [r for r in args.resources if r not in RESOURCE_MAP]
     if invalid:

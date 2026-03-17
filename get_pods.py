@@ -8,6 +8,12 @@ from rich.console import Console
 from rich import box
 import argparse
 
+parser=argparse.ArgumentParser()
+parser.add_argument("filter", nargs="?", type=str, default=None, help="Filter on pod name")
+parser.add_argument("-n","--namespace", type=str, default=None, help="Namespace filter")
+parser.add_argument("-N","--node", type=str, default=None, help="Node Filter")
+args=parser.parse_args()
+
 def list_pods():
     config.load_kube_config()
     v1 = client.CoreV1Api()
@@ -19,6 +25,16 @@ def list_pods():
       namespace = pod.metadata.namespace
       name = pod.metadata.name
       node = pod.spec.node_name or "N/A"
+
+      if (args.filter and args.filter.lower() not in name.lower()): 
+          continue
+
+      if (args.node and node!=args.node): 
+          continue
+
+      if (args.namespace and namespace!=args.namespace): 
+          continue
+
       labels = [f"{k}={v}" for k, v in (pod.metadata.labels or {}).items()]
 
       yield (pod_phase, namespace, name, pod_ip, node, labels)

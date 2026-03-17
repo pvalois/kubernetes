@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
-import argparse
-import csv
-import json
-import sys
-
-from collections import defaultdict
+import time
 from kubernetes import client, config
-
-from rich.table import Table
-from rich.table import box
 from rich.console import Console
+from rich.table import Table, box
+from urllib3.exceptions import ProtocolError, ReadTimeoutError
 
+
+# ---------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------
 
 def load_config():
     try:
@@ -20,146 +18,136 @@ def load_config():
         config.load_kube_config()
 
 
-def get_ingress_routes():
-    api = client.NetworkingV1Api()
-    ingresses = api.list_ingress_for_all_namespaces()
+# ---------------------------------------------------------------------
+# Safe low-level API calls (no OpenAPI objects)
+# ---------------------------------------------------------------------
 
-    routes = defaultdict(list)
+def safe_call(path, retries=5, delay=1):
+    api = client.ApiClient()
 
-    for ing in ingresses.items:
-        ns = ing.metadata.namespace
-        tls_hosts = set()
-        for tls in ing.spec.tls or []:
-            tls_hosts.update(tls.hosts or [])
+    for _ in range(retries):
+        try:
+            data, status, _ = api.call_api(
+                path,
+                "GET",
+                response_type="object",
+                _request_timeout=5,
+            )
+            if isinstance(data, dict):
+                return data
+        except (ValueError, ProtocolError, ReadTimeoutError):
+            pass
 
-        for rule in ing.spec.rules or []:
-            if not rule.http:
-                continue
+        time.sleep(delay)
 
-            host = rule.host or ""
-            for path in rule.http.paths:
-                svc = path.backend.service
-                if not svc:
-                    continue
+    return {}  # jamais d'exception
 
-                routes[(ns, svc.name)].append({
-                    "host": host,
-                    "path": path.path or "/",
-                    "port": svc.port.number or svc.port.name,
-                    "tls": host in tls_hosts
-                })
 
-    return routes
+# ---------------------------------------------------------------------
+# Collect Ingress → Service mapping
+# ---------------------------------------------------------------------
 
+def collect_ingresses():
+    ingress_map = {}
+    data = safe_call("/apis/networking.k8s.io/v1/ingresses")
+
+    for ing in data.get("items") or []:
+        meta = ing.get("metadata") or {}
+        spec = ing.get("spec") or {}
+
+        ns = meta.get("namespace")
+        for rule in spec.get("rules") or []:
+            host = rule.get("host")
+            http = rule.get("http") or {}
+
+            for path in http.get("paths") or []:
+                backend = path.get("backend") or {}
+                service = (backend.get("service") or {}).get("name")
+
+                if ns and service and host:
+                    ingress_map.setdefault((ns, service), set()).add(host)
+
+    return ingress_map
+
+
+# ---------------------------------------------------------------------
+# Collect EndpointSlices
+# ---------------------------------------------------------------------
 
 def collect_data():
-    discovery = client.DiscoveryV1Api()
-    slices = discovery.list_endpoint_slice_for_all_namespaces()
-    ingress_routes = get_ingress_routes()
-
     rows = []
+    ingress_map = collect_ingresses()
+    data = safe_call("/apis/discovery.k8s.io/v1/endpointslices")
 
-    for es in slices.items:
-        ns = es.metadata.namespace
-        svc_name = es.metadata.labels.get("kubernetes.io/service-name")
-        if not svc_name:
-            continue
+    for es in data.get("items") or []:
+        meta = es.get("metadata") or {}
+        labels = meta.get("labels") or {}
 
-        svc_dns = f"{svc_name}.{ns}.svc.cluster.local"
-        routes = ingress_routes.get((ns, svc_name), [])
+        ns = meta.get("namespace", "-")
+        svc = labels.get("kubernetes.io/service-name", "-")
+        service_dns = f"{svc}.{ns}.svc.cluster.local"
 
-        ports = [ { "port": p.port, "protocol": p.protocol or "TCP" } for p in es.ports or [] if p.port ]
+        endpoints = es.get("endpoints") or []
+        ports = es.get("ports") or []
 
-        for ep in es.endpoints:
-            ready = ep.conditions.ready
-            for addr in ep.addresses or []:
-                if ports:
-                    for p in ports: 
-                        rows.append( build_row( ns, svc_name, addr, f"{p['port']}/{p['protocol']}", svc_dns, routes, ready))
-                else:
-                    rows.append(build_row(ns, svc_name, addr, None, svc_dns, routes, ready))
+        for ep in endpoints:
+            conditions = ep.get("conditions") or {}
+            ready = conditions.get("ready", False)
+
+            for addr in ep.get("addresses") or []:
+                for port in ports or [{}]:
+                    rows.append({
+                        "namespace": ns,
+                        "service": svc,
+                        "endpoint_ip": addr,
+                        "port": port.get("port", "-"),
+                        "service_dns": service_dns,
+                        "ingress_urls": ", ".join(
+                            sorted([f"http://{url}" for url in ingress_map.get((ns, svc), [])])
+                        ) or "-",
+                        "ready": "[bright_green]YES[/bright_green]" if ready else "[bright_red]NO[/bright_red]",
+                    })
 
     return rows
 
 
-def build_row(ns, svc, ip, port, dns, routes, ready):
-    return {
-        "namespace": ns,
-        "service": svc,
-        "endpoint_ip": ip,
-        "port": port,
-        "service_dns": dns,
-        "ingress_urls": [
-            f"{'https' if r['tls'] else 'http'}://{r['host']}{r['path']}"
-            for r in routes
-        ],
-        "ready": ready
-    }
+# ---------------------------------------------------------------------
+# Render with Rich
+# ---------------------------------------------------------------------
 
+def render_table(rows):
+    table = Table(box=box.SIMPLE_HEAVY)
 
-def print_table(rows):
-    table = Table(box=box.MINIMAL)
-
-    table.add_column("Namespace", style="white")
-    table.add_column("Service", style="cyan")
-    table.add_column("Endpoint IP", style="yellow")
-    table.add_column("Port", style="white")
-    table.add_column("Service DNS", style="green")
-    table.add_column("Ingress URLS", style="yellow")
-    table.add_column("Ready", style="white")
-
+    table.add_column("Namespace", style="bright_white", overflow="ellipsis", no_wrap=True)
+    table.add_column("Service", style="bright_cyan", overflow="ellipsis", no_wrap=True)
+    table.add_column("Endpoint ip", style="bright_white", overflow="ellipsis", no_wrap=True)
+    table.add_column("Port", style="purple", overflow="ellipsis", no_wrap=True, justify="right")
+    table.add_column("Service dns", style="bright_yellow", overflow="ellipsis", no_wrap=True)
+    table.add_column("Ingress urls", style="bright_green", overflow="ellipsis", no_wrap=True)
+    table.add_column("Ready", style="bright_white", overflow="ellipsis", no_wrap=True, justify="center")
 
     for r in rows:
         table.add_row(
             r["namespace"],
             r["service"],
             r["endpoint_ip"],
-            r["port"],
+            str(r["port"]),
             r["service_dns"],
-            "\n".join(r["ingress_urls"]) if r["ingress_urls"] else "",
-            str(r["ready"])
+            r["ingress_urls"],
+            r["ready"],
         )
 
-    console=Console()
-    console.print(table) 
-
-def output_json(rows):
-    data = json.dumps(rows, indent=2)
-    print(data)
+    Console().print(table)
 
 
-def output_csv(rows):
-    fieldnames = [
-        "namespace",
-        "service",
-        "endpoint_ip",
-        "port",
-        "service_dns",
-        "ingress_urls",
-        "ready"
-    ]
-
-    writer = csv.DictWriter(sys.stdout,fieldnames=fieldnames)
-    writer.writeheader()
-
-    for r in rows:
-        row = r.copy()
-        row["ingress_urls"] = ";".join(r["ingress_urls"])
-        writer.writerow(row)
-
+# ---------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--format", choices=["json", "csv"])
-    args = parser.parse_args()
-
     load_config()
     rows = collect_data()
-
-    if args.format == "json": output_json(rows) 
-    elif args.format == "csv": output_csv(rows)
-    else:
-      print_table(rows)
+    render_table(rows)
 
 
 if __name__ == "__main__":
