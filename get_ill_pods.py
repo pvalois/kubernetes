@@ -124,7 +124,7 @@ if __name__ == "__main__":
             else:
                 print(cmd)
     
-            if args.report and (args.unsecure or not is_protected):
+            if args.verbose and (args.unsecure or not is_protected):
                 do_report(ns, name, pod)
 
             print()
