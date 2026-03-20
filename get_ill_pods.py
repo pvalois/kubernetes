@@ -20,6 +20,7 @@ except ImportError:
 parser = argparse.ArgumentParser()
 parser.add_argument('-U', '--unsecure', default=False, action='store_true', help='Allow destruction of system pods')
 parser.add_argument('-R', '--report', default=False, action='store_true', help='Display debug info on stderr')
+parser.add_argument('filters', nargs="*", default=[""], help='Filtre sur le nom du pod malade')
 args = parser.parse_args()
 
 try:
@@ -86,7 +87,11 @@ def do_report(ns, podname, pod_obj):
             )
             
             for e in sorted_events[-3:]:
-                print_err(f"[{e.reason}] {e.message}")
+                ts = e.last_timestamp or e.first_timestamp
+                if (ts):
+                    time_str = ts.strftime("%H:%M:%S")
+                    print_err(f"{time_str} [{e.reason}] {e.message}")
+
     except ApiException:
         pass
 
@@ -95,6 +100,9 @@ if __name__ == "__main__":
         ns = pod.metadata.namespace
         name = pod.metadata.name
         reason = pod.status.phase
+
+        if (not any(words in name for words in args.filters)):
+            continue
     
         if pod.status.container_statuses:
             for cs in pod.status.container_statuses:
@@ -109,12 +117,14 @@ if __name__ == "__main__":
             is_protected = ns in protected_namespaces
             
             cmd = f"kubectl delete -n {ns} pod {name}"
+
+            print_err(f">> Purge command", color=Fore.CYAN + Style.BRIGHT)
             if not args.unsecure and is_protected:
                 print(f"# {cmd}")
             else:
                 print(cmd)
     
             if args.report and (args.unsecure or not is_protected):
-                print()
                 do_report(ns, name, pod)
-                print()
+
+            print()
