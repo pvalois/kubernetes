@@ -19,7 +19,7 @@ except ImportError:
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-U', '--unsecure', default=False, action='store_true', help='Allow destruction of system pods')
-parser.add_argument('-R', '--report', default=False, action='store_true', help='Display debug info on stderr')
+parser.add_argument('-v', '--verbose', default=False, action='store_true', help='Display debug info on stderr')
 parser.add_argument('filters', nargs="*", default=[""], help='Filtre sur le nom du pod malade')
 args = parser.parse_args()
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         name = pod.metadata.name
         reason = pod.status.phase
 
-        if (not any(words in name for words in args.filters)):
+        if (not any((word in name or word in ns) for word in args.filters)):
             continue
     
         if pod.status.container_statuses:
